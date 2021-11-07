@@ -1,0 +1,110 @@
+plugins {
+	id 'org.springframework.boot' version '2.6.0-RC1'
+	id 'io.spring.dependency-management' version '1.0.11.RELEASE'
+	id 'java'
+	id 'war'
+	id "name.remal.sonarlint" version "1.5.0"
+	id 'checkstyle'
+	id "org.sonarqube" version "3.2.0"
+	id 'jacoco'
+}
+
+group = 'com.eliseo'
+version = '0.0.1-SNAPSHOT'
+sourceCompatibility = '11'
+
+repositories {
+	mavenCentral()
+	maven { url 'https://repo.spring.io/milestone' }
+}
+
+dependencies {
+	implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+	implementation 'org.springframework.boot:spring-boot-starter-web'
+	providedRuntime 'org.springframework.boot:spring-boot-starter-tomcat'
+	testImplementation 'org.springframework.boot:spring-boot-starter-test'
+	
+	implementation group: 'org.apache.logging.log4j', name: 'log4j-api', version: '2.14.1'
+	
+	runtimeOnly 'mysql:mysql-connector-java'
+	implementation group: 'javax.validation', name: 'validation-api', version: '2.0.1.Final'
+	
+	testImplementation group: 'org.junit.jupiter', name: 'junit-jupiter-api', version: '5.8.0-M1'
+	testImplementation group: 'org.junit.jupiter', name: 'junit-jupiter-engine', version: '5.8.0-M1'
+	testImplementation group: 'org.junit.jupiter', name: 'junit-jupiter-params', version: '5.8.0-M1'
+	testImplementation group: 'org.mockito', name: 'mockito-junit-jupiter', version: '3.11.2'
+}
+
+test {
+	useJUnitPlatform()
+}
+
+apply plugin: "name.remal.sonarlint"
+apply plugin: "checkstyle"
+apply plugin: "jacoco"
+
+checkstyle {
+  configFile = file("${project.rootDir}/config/checkstyle/checkstyle.xml")
+  toolVersion = '8.44'
+}
+task checkstyle(type: Checkstyle) {
+    configFile file("${project.rootDir}/config/checkstyle/checkstyle.xml")
+    source 'src'
+    include '**/*.java'
+    classpath = files()
+}
+checkstyleMain {
+    source ='src/main/java'
+}
+checkstyleTest {
+    source ='src/test/java'
+}
+tasks.withType(Checkstyle) {
+    reports {
+        xml.enabled false
+        html.enabled true
+    }
+}
+
+jacocoTestCoverageVerification {
+    violationRules {
+        rule {
+            limit {
+                minimum = 0.3
+            }
+            excludes = [
+                'com.eliseo.config.*'
+            ]
+        }
+    }
+}
+
+jacocoTestReport {
+    reports {
+    	html.enabled true
+        xml.enabled true
+        csv.enabled false
+        html.destination file("${buildDir}/jacocoHtml")
+    }
+    afterEvaluate {
+        getClassDirectories().setFrom(files(classDirectories.files.collect {
+           fileTree(dir: it, exclude: ['']
+           			) }))
+    }
+}
+
+
+sonarqube {
+    properties {
+        property "sonar.sourceEncoding", "UTF-8"
+        property "sonar.coverage.jacoco.xmlReportPaths", "${project.buildDir}/jacocoHtml"
+    }
+}
+
+compileJava.options.encoding = 'UTF-8'
+
+tasks.withType(JavaCompile) {
+    options.encoding = 'UTF-8'
+}
+
+check.dependsOn('jacocoTestReport','jacocoTestCoverageVerification')
